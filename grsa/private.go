@@ -20,6 +20,10 @@ type Private struct {
 	Format string // pkcs1(default) or pkcs8
 }
 
+func NewPrivate(key *rsa.PrivateKey) *Private {
+	return &Private{key: key}
+}
+
 func (s *Private) Key() *rsa.PrivateKey {
 	return s.key
 }

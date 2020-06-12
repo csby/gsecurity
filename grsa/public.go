@@ -16,6 +16,10 @@ type Public struct {
 	key *rsa.PublicKey
 }
 
+func NewPublic(key *rsa.PublicKey) *Public {
+	return &Public{key: key}
+}
+
 func (s *Public) Key() *rsa.PublicKey {
 	return s.key
 }
