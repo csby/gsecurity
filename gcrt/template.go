@@ -10,6 +10,13 @@ import (
 	"time"
 )
 
+const (
+	OrgCA     = "ca"
+	OrgServer = "server"
+	OrgClient = "client"
+	OrgUser   = "user"
+)
+
 type Template struct {
 	// 显示名称
 	CommonName string
@@ -76,11 +83,11 @@ func (s *Template) Template() (*x509.Certificate, error) {
 	}
 	notAfter := notBefore.Add(time.Duration(days * 24 * time.Hour.Nanoseconds()))
 
-	if strings.ToLower(s.Organization) == "ca" {
+	if strings.ToLower(s.Organization) == OrgCA {
 		isCA = true
 		keyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
 		extKeyUsage = nil
-	} else if strings.ToLower(s.Organization) == "server" {
+	} else if strings.ToLower(s.Organization) == OrgServer {
 		extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
 		if len(s.Hosts) > 0 {
 			for _, h := range s.Hosts {

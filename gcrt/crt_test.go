@@ -64,7 +64,7 @@ func testCreateCA() (*Crt, *grsa.Private, error) {
 	}
 
 	crtTemplate := &Template{
-		Organization:       "ca",
+		Organization:       OrgCA,
 		OrganizationalUnit: "sgw",
 		Locality:           "华东",
 		Province:           "浙江",
@@ -107,7 +107,7 @@ func testCreateServer(caCrt *Crt, caPrivate *grsa.Private) (*Pfx, *grsa.Private,
 	}
 
 	crtTemplate := &Template{
-		Organization:       "server",
+		Organization:       OrgServer,
 		OrganizationalUnit: "vs",
 		Locality:           "华东",
 		Province:           "浙江",
@@ -164,7 +164,7 @@ func testCreateClient(caCrt *Crt, caPrivate *grsa.Private) (*Pfx, *grsa.Private,
 	}
 
 	crtTemplate := &Template{
-		Organization:       "client",
+		Organization:       OrgClient,
 		OrganizationalUnit: "hospital",
 		Locality:           "华东",
 		Province:           "浙江",

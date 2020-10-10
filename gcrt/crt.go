@@ -80,15 +80,17 @@ func (s *Crt) FromCertificate(certificate *x509.Certificate) {
 	s.certificate = certificate
 }
 
-func (s *Crt) FromConnectionState(state *tls.ConnectionState) {
+func (s *Crt) FromConnectionState(state *tls.ConnectionState) error {
 	if state == nil {
-		return
+		return fmt.Errorf("invalid paramter: state is nil")
 	}
 	if len(state.PeerCertificates) < 1 {
-		return
+		return fmt.Errorf("no certificate exist")
 	}
 
 	s.certificate = state.PeerCertificates[0]
+
+	return nil
 }
 
 func (s *Crt) FromFile(path string) error {
