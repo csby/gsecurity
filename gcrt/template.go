@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	OrgCA     = "ca"
-	OrgServer = "server"
-	OrgClient = "client"
-	OrgUser   = "user"
+	OrgCA           = "ca"
+	OrgServer       = "server"
+	OrgClient       = "client"
+	OrgServerClient = "server&client"
+	OrgUser         = "user"
 )
 
 type Template struct {
@@ -87,8 +88,14 @@ func (s *Template) Template() (*x509.Certificate, error) {
 		isCA = true
 		keyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
 		extKeyUsage = nil
-	} else if strings.ToLower(s.Organization) == OrgServer {
-		extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
+	} else if strings.ToLower(s.Organization) == OrgServer ||
+		strings.ToLower(s.Organization) == OrgServerClient {
+		if strings.ToLower(s.Organization) == OrgServerClient {
+			extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
+		} else {
+			extKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
+		}
+
 		if len(s.Hosts) > 0 {
 			for _, h := range s.Hosts {
 				if ip := net.ParseIP(h); ip != nil {
