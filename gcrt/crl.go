@@ -16,17 +16,31 @@ import (
 	"time"
 )
 
+const (
+	CRLReasonCodeUnspecified          asn1.Enumerated = 0  // 未指定(0)
+	CRLReasonCodeKeyCompromise        asn1.Enumerated = 1  // 密钥泄漏(1)
+	CRLReasonCodeCACompromise         asn1.Enumerated = 2  // CA泄漏(2)
+	CRLReasonCodeAffiliationChanged   asn1.Enumerated = 3  // 附属关系已更改(3)
+	CRLReasonCodeSuperseded           asn1.Enumerated = 4  // 被取代(4)
+	CRLReasonCodeCessationOfOperation asn1.Enumerated = 5  // 停止操作(5)
+	CRLReasonCodeCertificateHold      asn1.Enumerated = 6  // 证书挂起(6)
+	CRLReasonCodeRemoveFromCRL        asn1.Enumerated = 8  // 从CRL中删除(8)
+	CRLReasonCodePrivilegeWithdrawn   asn1.Enumerated = 9  // 取消特权(9)
+	CRLReasonCodeAACompromise         asn1.Enumerated = 10 //  (10)
+)
+
 type RevokedItem struct {
-	SerialNumber       *big.Int   `json:"serialNumber" note:"证书序号"`
-	RevocationTime     time.Time  `json:"revocationTime" note:"吊销时间"`
-	Organization       string     `json:"organization" note:"证书类型"`
-	OrganizationalUnit string     `json:"organizationalUnit" note:"证书标识"`
-	CommonName         string     `json:"common_name" note:"显示名称"`
-	Locality           string     `json:"locality" note:"地区"`
-	Province           string     `json:"province" note:"省份"`
-	StreetAddress      string     `json:"streetAddress" note:"地址"`
-	NotBefore          *time.Time `json:"notBefore" note:"起始有效期"`
-	NotAfter           *time.Time `json:"notAfter" note:"截止有效期"`
+	SerialNumber       *big.Int        `json:"serialNumber" note:"证书序号"`
+	RevocationTime     time.Time       `json:"revocationTime" note:"吊销时间"`
+	ReasonCode         asn1.Enumerated `json:"reasonCode" note："理由代码"`
+	Organization       string          `json:"organization" note:"证书类型"`
+	OrganizationalUnit string          `json:"organizationalUnit" note:"证书标识"`
+	CommonName         string          `json:"common_name" note:"显示名称"`
+	Locality           string          `json:"locality" note:"地区"`
+	Province           string          `json:"province" note:"省份"`
+	StreetAddress      string          `json:"streetAddress" note:"地址"`
+	NotBefore          *time.Time      `json:"notBefore" note:"起始有效期"`
+	NotAfter           *time.Time      `json:"notAfter" note:"截止有效期"`
 }
 
 func (s RevokedItem) String() string {
@@ -43,19 +57,20 @@ func (s *RevokedItem) Extensions() []pkix.Extension {
 		extensions = append(extensions, extension)
 	}
 
-	s.addExtension(OidOrganization, s.Organization, adder)
-	s.addExtension(OidOrganizationalUnit, s.OrganizationalUnit, adder)
-	s.addExtension(OidCommonName, s.CommonName, adder)
-	s.addExtension(OidLocality, s.Locality, adder)
-	s.addExtension(OidProvince, s.Province, adder)
-	s.addExtension(OidStreetAddress, s.StreetAddress, adder)
-	s.addExtension(OidNotBefore, s.NotBefore, adder)
-	s.addExtension(OidNotAfter, s.NotAfter, adder)
+	s.addExtensionWidthAsn1(OidCRLReasonCode, s.ReasonCode, adder)
+	s.addExtensionWidthJson(OidOrganization, s.Organization, adder)
+	s.addExtensionWidthJson(OidOrganizationalUnit, s.OrganizationalUnit, adder)
+	s.addExtensionWidthJson(OidCommonName, s.CommonName, adder)
+	s.addExtensionWidthJson(OidLocality, s.Locality, adder)
+	s.addExtensionWidthJson(OidProvince, s.Province, adder)
+	s.addExtensionWidthJson(OidStreetAddress, s.StreetAddress, adder)
+	s.addExtensionWidthJson(OidNotBefore, s.NotBefore, adder)
+	s.addExtensionWidthJson(OidNotAfter, s.NotAfter, adder)
 
 	return extensions
 }
 
-func (s *RevokedItem) addExtension(oid asn1.ObjectIdentifier, val interface{}, adder func(extension pkix.Extension)) {
+func (s *RevokedItem) addExtensionWidthJson(oid asn1.ObjectIdentifier, val interface{}, adder func(extension pkix.Extension)) {
 	value, err := json.Marshal(val)
 	if err != nil {
 		return
@@ -66,10 +81,21 @@ func (s *RevokedItem) addExtension(oid asn1.ObjectIdentifier, val interface{}, a
 	}
 }
 
+func (s *RevokedItem) addExtensionWidthAsn1(oid asn1.ObjectIdentifier, val interface{}, adder func(extension pkix.Extension)) {
+	value, err := asn1.Marshal(val)
+	if err != nil {
+		return
+	}
+
+	if adder != nil {
+		adder(pkix.Extension{Id: oid, Value: value})
+	}
+}
+
 type RevokedInfo struct {
-	ThisUpdate *time.Time    `json:"thisUpdate" note:"本次更新时间"`
-	NextUpdate *time.Time    `json:"nextUpdate" note:"下次更新时间"`
-	Items      []RevokedItem `json:"items" note:"证书列表"`
+	ThisUpdate *time.Time     `json:"thisUpdate" note:"本次更新时间"`
+	NextUpdate *time.Time     `json:"nextUpdate" note:"下次更新时间"`
+	Items      []*RevokedItem `json:"items" note:"证书列表"`
 }
 
 type Crl struct {
@@ -78,7 +104,7 @@ type Crl struct {
 
 func (s *Crl) Info() (*RevokedInfo, error) {
 	info := &RevokedInfo{
-		Items: make([]RevokedItem, 0),
+		Items: make([]*RevokedItem, 0),
 	}
 	if s.crl == nil {
 		return info, fmt.Errorf("invalid crl")
@@ -90,23 +116,24 @@ func (s *Crl) Info() (*RevokedInfo, error) {
 	lst := crl.RevokedCertificates
 	lstCount := len(lst)
 	for lstIndex := 0; lstIndex < lstCount; lstIndex++ {
-		item := RevokedItem{
+		item := &RevokedItem{
 			SerialNumber:   lst[lstIndex].SerialNumber,
 			RevocationTime: lst[lstIndex].RevocationTime,
 		}
 
 		extensions := lst[lstIndex].Extensions
 		if len(extensions) > 0 {
-			err := s.getExtension(extensions, OidOrganization, &item.Organization)
+			_, err := s.getExtensionFromAsn1(extensions, OidCRLReasonCode, &item.ReasonCode)
 			if err != nil {
 			}
-			err = s.getExtension(extensions, OidOrganizationalUnit, &item.OrganizationalUnit)
-			err = s.getExtension(extensions, OidCommonName, &item.CommonName)
-			err = s.getExtension(extensions, OidLocality, &item.Locality)
-			err = s.getExtension(extensions, OidProvince, &item.Province)
-			err = s.getExtension(extensions, OidStreetAddress, &item.StreetAddress)
-			err = s.getExtension(extensions, OidNotBefore, &item.NotBefore)
-			err = s.getExtension(extensions, OidNotAfter, &item.NotAfter)
+			err = s.getExtensionFromJson(extensions, OidOrganization, &item.Organization)
+			err = s.getExtensionFromJson(extensions, OidOrganizationalUnit, &item.OrganizationalUnit)
+			err = s.getExtensionFromJson(extensions, OidCommonName, &item.CommonName)
+			err = s.getExtensionFromJson(extensions, OidLocality, &item.Locality)
+			err = s.getExtensionFromJson(extensions, OidProvince, &item.Province)
+			err = s.getExtensionFromJson(extensions, OidStreetAddress, &item.StreetAddress)
+			err = s.getExtensionFromJson(extensions, OidNotBefore, &item.NotBefore)
+			err = s.getExtensionFromJson(extensions, OidNotAfter, &item.NotAfter)
 		}
 
 		info.Items = append(info.Items, item)
@@ -266,7 +293,7 @@ func (s *Crl) ToMemory(caCrt *Crt, caKey *grsa.Private, thisUpdate, nextUpdate *
 	return pem.EncodeToMemory(block), nil
 }
 
-func (s *Crl) getExtension(extensions []pkix.Extension, oid asn1.ObjectIdentifier, v interface{}) error {
+func (s *Crl) getExtensionFromJson(extensions []pkix.Extension, oid asn1.ObjectIdentifier, v interface{}) error {
 	extLen := len(extensions)
 	for idx := 0; idx < extLen; idx++ {
 		if extensions[idx].Id.Equal(oid) {
@@ -280,4 +307,15 @@ func (s *Crl) getExtension(extensions []pkix.Extension, oid asn1.ObjectIdentifie
 	}
 
 	return fmt.Errorf("not found")
+}
+
+func (s *Crl) getExtensionFromAsn1(extensions []pkix.Extension, oid asn1.ObjectIdentifier, v interface{}) ([]byte, error) {
+	extLen := len(extensions)
+	for idx := 0; idx < extLen; idx++ {
+		if extensions[idx].Id.Equal(oid) {
+			return asn1.Unmarshal(extensions[idx].Value, v)
+		}
+	}
+
+	return nil, fmt.Errorf("not found")
 }

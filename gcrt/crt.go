@@ -25,6 +25,7 @@ var (
 	OidStreetAddress      = []int{2, 5, 4, 9}          // 地址 (string)
 	OidNotBefore          = []int{2, 8, 8, 6, 3, 1, 4} // 起始有效期 (time)
 	OidNotAfter           = []int{2, 8, 8, 6, 3, 1, 5} // 截止有效期 (time)
+	OidCRLReasonCode      = []int{2, 5, 29, 21}        // CRL 理由吗
 )
 
 type Crt struct {

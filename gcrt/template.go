@@ -26,6 +26,7 @@ type Template struct {
 	// ca：根证书
 	// server：服务器证书
 	// client：客户端证书
+	// server&client：服务器和客户端证书
 	// user：用户证书
 	Organization string
 
@@ -77,16 +78,17 @@ func (s *Template) Template() (*x509.Certificate, error) {
 	ips := make([]net.IP, 0)
 	dns := make([]string, 0)
 
-	notBefore := time.Now()
+	now := time.Now()
+	notBefore := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	days := s.ExpiredDays
 	if days < 1 {
-		days = 365
+		days = 1
 	}
-	notAfter := notBefore.Add(time.Duration(days * 24 * time.Hour.Nanoseconds()))
+	notAfter := notBefore.Add(time.Duration(days*24*time.Hour.Nanoseconds()) - time.Second)
 
 	if strings.ToLower(s.Organization) == OrgCA {
 		isCA = true
-		keyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
+		keyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign
 		extKeyUsage = nil
 	} else if strings.ToLower(s.Organization) == OrgServer ||
 		strings.ToLower(s.Organization) == OrgServerClient {
