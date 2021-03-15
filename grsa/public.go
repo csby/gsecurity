@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/csby/gsecurity/ghash"
 	"os"
+	"path/filepath"
 )
 
 type Public struct {
@@ -151,4 +152,34 @@ func (s *Public) ToMemory() ([]byte, error) {
 	}
 
 	return pem.EncodeToMemory(block), nil
+}
+
+func (s *Public) ToFile(path string) error {
+	if s.key == nil {
+		return fmt.Errorf("invalid key")
+	}
+
+	data, err := x509.MarshalPKIXPublicKey(s.key)
+	if err != nil {
+		return err
+	}
+
+	block := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: data,
+	}
+
+	folder := filepath.Dir(path)
+	err = os.MkdirAll(folder, 0777)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	return pem.Encode(file, block)
 }
